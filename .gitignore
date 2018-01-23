@@ -3,9 +3,13 @@
 # Files and directories created by pub
 .packages
 .pub/
+.idea/
 build/
 # If you're building an application, you may want to check-in your pubspec.lock
 pubspec.lock
+
+draw.ini
+*.swp
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.

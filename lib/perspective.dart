@@ -4,9 +4,77 @@ import 'dart:convert';
 import 'package:http/http.dart';
 
 class PerspectiveFilter {
-  PerspectiveFilter();
+  final Map<PerspectiveAttribute, double> _thresholds = new Map();
+
+  PerspectiveAttribute get lastFilterReason => _lastFilterReason;
+  PerspectiveAttribute _lastFilterReason;
+
+  PerspectiveFilter([Map<PerspectiveAttribute, double> thresholds]) {
+    if (thresholds != null) _thresholds.addAll(thresholds);
+  }
+
+  void add(PerspectiveAttribute attribute, double threshold) =>
+      _thresholds[attribute] = threshold;
+
+  void remove(PerspectiveAttribute attribute) => _thresholds.remove(attribute);
+
+  void clear() => _thresholds.clear();
+
+  double attributeThreshold(PerspectiveAttribute attribute) =>
+      _thresholds.containsKey(attribute) ? _thresholds[attribute] : 0.0;
+
   bool shouldFilter(PerspectiveResponse response) {
-    return false;
+    bool filter = false;
+    double maxResult = 0.0;
+
+    Function filterHelper = (a, t, v) {
+      if (v >= t && v >= maxResult) {
+        filter = true;
+        maxResult = v;
+        _lastFilterReason = a;
+      }
+    };
+
+    _thresholds.forEach((a, t) {
+      switch (a) {
+        case PerspectiveAttribute.Toxicity:
+          filterHelper(a, t, response.toxicity);
+          break;
+        case PerspectiveAttribute.SevereToxicity:
+          filterHelper(a, t, response.severeToxicity);
+          break;
+        case PerspectiveAttribute.ToxicityFast:
+          filterHelper(a, t, response.toxicityFast);
+          break;
+        case PerspectiveAttribute.AttackOnAuthor:
+          filterHelper(a, t, response.attackOnAuthor);
+          break;
+        case PerspectiveAttribute.AttackOnCommenter:
+          filterHelper(a, t, response.attackOnCommenter);
+          break;
+        case PerspectiveAttribute.Incoherent:
+          filterHelper(a, t, response.incoherent);
+          break;
+        case PerspectiveAttribute.Inflammatory:
+          filterHelper(a, t, response.inflammatory);
+          break;
+        case PerspectiveAttribute.LikelyToReject:
+          filterHelper(a, t, response.likelyToReject);
+          break;
+        case PerspectiveAttribute.Obscene:
+          filterHelper(a, t, response.obscene);
+          break;
+        case PerspectiveAttribute.Spam:
+          filterHelper(a, t, response.spam);
+          break;
+        case PerspectiveAttribute.Unsubstantial:
+          filterHelper(a, t, response.unsubstantial);
+          break;
+        default:
+          throw new UnimplementedError('$a is not a valid Perspective type.');
+      }
+    });
+    return filter;
   }
 }
 
@@ -17,46 +85,46 @@ class PerspectiveResponse {
 
   final Map _results;
 
-  double get toxicity => _summaryScore(PerspectiveAttribute.Toxicity);
+  double get toxicity => summaryScore(PerspectiveAttribute.Toxicity);
 
   double get severeToxicity =>
-      _summaryScore(PerspectiveAttribute.SevereToxicity);
+      summaryScore(PerspectiveAttribute.SevereToxicity);
 
-  double get toxicityFast => _summaryScore(PerspectiveAttribute.ToxicityFast);
+  double get toxicityFast => summaryScore(PerspectiveAttribute.ToxicityFast);
 
   double get attackOnAuthor =>
-      _summaryScore(PerspectiveAttribute.AttackOnAuthor);
+      summaryScore(PerspectiveAttribute.AttackOnAuthor);
 
   double get attackOnCommenter =>
-      _summaryScore(PerspectiveAttribute.AttackOnCommenter);
+      summaryScore(PerspectiveAttribute.AttackOnCommenter);
 
-  double get incoherent => _summaryScore(PerspectiveAttribute.Incoherent);
+  double get incoherent => summaryScore(PerspectiveAttribute.Incoherent);
 
-  double get inflammatory => _summaryScore(PerspectiveAttribute.Inflammatory);
+  double get inflammatory => summaryScore(PerspectiveAttribute.Inflammatory);
 
   double get likelyToReject =>
-      _summaryScore(PerspectiveAttribute.LikelyToReject);
+      summaryScore(PerspectiveAttribute.LikelyToReject);
 
-  double get obscene => _summaryScore(PerspectiveAttribute.Obscene);
+  double get obscene => summaryScore(PerspectiveAttribute.Obscene);
 
-  double get spam => _summaryScore(PerspectiveAttribute.Spam);
+  double get spam => summaryScore(PerspectiveAttribute.Spam);
 
-  double get unsubstantial => _summaryScore(PerspectiveAttribute.Unsubstantial);
+  double get unsubstantial => summaryScore(PerspectiveAttribute.Unsubstantial);
 
   PerspectiveResponse(
       String this.body, List<PerspectiveAttribute> this.attributes, Map results)
       : _results = results;
 
-  double _summaryScore(PerspectiveAttribute attribute) =>
+  double summaryScore(
+          PerspectiveAttribute attribute) =>
       _results['attributeScores']
-              .containsKey(_perspectiveAttributeToString(attribute))
-          ? _results['attributeScores']
-                  [_perspectiveAttributeToString(attribute)]['summaryScore']
-              ['value']
+              .containsKey(perspectiveAttributeToString(attribute))
+          ? _results['attributeScores'][perspectiveAttributeToString(attribute)]
+              ['summaryScore']['value']
           : 0.0;
 
   void _toStringHelper(StringBuffer s, a, v) =>
-      s.writeln('${_perspectiveAttributeToString(a)}: $v');
+      s.writeln('${perspectiveAttributeToString(a)}: $v');
 
   String toString() {
     StringBuffer s = new StringBuffer();
@@ -102,7 +170,7 @@ enum PerspectiveAttribute {
   Unsubstantial,
 }
 
-String _perspectiveAttributeToString(PerspectiveAttribute a) {
+String perspectiveAttributeToString(PerspectiveAttribute a) {
   switch (a) {
     case PerspectiveAttribute.Toxicity:
       return "TOXICITY";
@@ -138,7 +206,7 @@ class PerspectiveRequester {
 
   final List<PerspectiveAttribute> _attributes = <PerspectiveAttribute>[];
 
-  static void SetApiKey(String key) => _API_KEY = key;
+  static void setApiKey(String key) => _API_KEY = key;
 
   void addAttribute(PerspectiveAttribute attribute) =>
       _attributes.add(attribute);
@@ -157,7 +225,7 @@ class PerspectiveRequester {
 
     Map requestAttributes = {};
     _attributes.forEach((attribute) {
-      requestAttributes[_perspectiveAttributeToString(attribute)] = {};
+      requestAttributes[perspectiveAttributeToString(attribute)] = {};
     });
     request["requestedAttributes"] = requestAttributes;
 
